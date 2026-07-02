@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>M3E RSS Reader</title>
+    <style>
+        /* === MATERIAL 3 EXPRESSIVE DARK THEME === */
+        :root {
+            --md-sys-color-background: #1A1C19;
+            --md-sys-color-on-background: #E2E3DD;
+            --md-sys-color-surface: #2A2C29; 
+            --md-sys-color-on-surface: #E2E3DD;
+            --md-sys-color-on-surface-variant: #C2C9BD; 
+            --md-sys-color-primary: #9CD67D; 
+            --md-sys-color-on-primary: #0C3900;
+            --md-sys-color-primary-container: #265108;
+            --md-sys-color-error: #FFB4AB; 
+            --md-sys-color-error-container: #93000A;
+            --md-sys-color-outline: #8C9388;
+            --md-sys-color-surface-container-highest: #333532;
+            
+            --radius-large: 28px;
+            --radius-medium: 16px;
+            --spacing: 12px;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--md-sys-color-background);
+            color: var(--md-sys-color-on-background);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* === HEADERS === */
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px var(--spacing) 10px var(--spacing);
+            gap: 12px;
+        }
+        .app-title { font-size: 24px; font-weight: 700; color: var(--md-sys-color-primary); margin: 0; }
+        
+        .header-title {
+            flex: 1;
+            text-align: left;
+            font-weight: 700;
+            font-size: 20px;
+            color: var(--md-sys-color-on-surface);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: 0;
+        }
+        
+        .header-btn {
+            background: transparent; border: none; color: var(--md-sys-color-primary);
+            font-size: 16px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            padding: 8px 12px;
+        }
+
+        /* === MAIN VIEWS === */
+        .view-container {
+            flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0 var(--spacing);
+            transition: opacity 0.3s;
+        }
+        .hidden { display: none !important; }
+
+        .scroll-area {
+            flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--spacing);
+        }
+        .scroll-area::after {
+            content: "";
+            min-height: 140px;
+            flex-shrink: 0;
+        }
+
+        /* === FEED CARDS === */
+        .feed-btn {
+            background-color: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            border: none; border-radius: var(--radius-medium);
+            padding: 16px; font-size: 16px; font-weight: 600;
+            display: flex; align-items: center; gap: 12px;
+            cursor: pointer; text-align: left;
+            transition: transform 0.2s, background-color 0.2s;
+            flex-shrink: 0;
+            user-select: none;
+        }
+        .feed-btn:active { transform: scale(0.98); background-color: var(--md-sys-color-surface-container-highest); }
+        .feed-icon { width: 24px; height: 24px; border-radius: 4px; background-color: white; padding: 2px; pointer-events: none; }
+        .feed-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;}
+        .feed-delete { 
+            color: var(--md-sys-color-error); background: transparent; border: none; 
+            font-size: 18px; padding: 4px 8px; cursor: pointer;
+        }
+
+        /* === ARTICLE CARDS === */
+        .article-card {
+            background-color: var(--md-sys-color-surface);
+            border-radius: var(--radius-medium);
+            display: flex; flex-direction: column;
+            text-decoration: none; color: inherit;
+            overflow: hidden;
+            transition: transform 0.2s;
+            flex-shrink: 0; 
+        }
+        .article-card:active { transform: scale(0.98); }
+        
+        .article-img-container {
+            width: 100%; height: 200px;
+            background-color: var(--md-sys-color-surface-container-highest);
+            display: block; 
+            flex-shrink: 0;
+        }
+        .article-img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .article-content { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+        .article-title { font-weight: bold; font-size: 16px; color: var(--md-sys-color-on-surface); line-height: 1.4; }
+        .article-desc { 
+            font-size: 14px; color: var(--md-sys-color-on-surface-variant); 
+            display: -webkit-box; -webkit-line-clamp: 10; -webkit-box-orient: vertical; overflow: hidden; 
+        }
+        .article-date { font-size: 12px; color: var(--md-sys-color-outline); margin-top: 4px; }
+
+        /* === BOTTOM BAR === */
+        #bottom-bar {
+            position: fixed; bottom: var(--spacing); left: var(--spacing); right: var(--spacing);
+            display: flex; gap: 8px; height: 56px;
+        }
+        .btn { border: none; border-radius: 100px; font-weight: 600; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .btn-primary { background-color: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); flex: 1;}
+        .btn-icon { background-color: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); flex: 0 0 56px; font-size: 20px;}
+
+        /* === MODALS === */
+        .modal {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--md-sys-color-background);
+            z-index: 100; display: flex; flex-direction: column;
+            transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+            padding: var(--spacing);
+        }
+        .modal.active { transform: translateY(0); }
+        
+        .modal-content {
+            background-color: var(--md-sys-color-surface);
+            border-radius: var(--radius-large); flex: 1; display: flex; flex-direction: column;
+            padding: 20px; border: 1px solid var(--md-sys-color-outline);
+        }
+
+        .modal-header { font-size: 22px; font-weight: bold; margin-bottom: 24px; color: var(--md-sys-color-primary); }
+        .editor-input { 
+            background: rgba(0,0,0,0.2); border: 1px solid var(--md-sys-color-outline); 
+            color: var(--md-sys-color-on-background); font-family: inherit; font-size: 16px;
+            padding: 16px; border-radius: 12px; margin-bottom: 16px; outline: none; width: 100%; 
+        }
+        .editor-input:focus { border-color: var(--md-sys-color-primary); }
+        
+        .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: auto; }
+        .text-btn { background: none; border: none; font-weight: bold; font-size: 14px; text-transform: uppercase; cursor: pointer; padding: 8px 16px; }
+        .settings-btn { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); border: none; padding: 16px; border-radius: var(--radius-medium); font-size: 16px; font-weight: bold; margin-bottom: 12px; cursor: pointer; }
+
+        /* === LOADING SPINNER === */
+        .loading-text { text-align: center; color: var(--md-sys-color-primary); font-weight: bold; padding: 20px; }
+    </style>
+</head>
+<body>
+
+    <!-- FEEDS VIEW -->
+    <div id="view-feeds" class="view-container">
+        <div class="app-header">
+            <h1 class="app-title">RSS Feeds</h1>
+        </div>
+        <div id="feed-list" class="scroll-area"></div>
+        <div id="bottom-bar">
+            <button class="btn btn-icon" onclick="openModal('settings-modal')">&#9881;&#65039;</button>
+            <button class="btn btn-primary" onclick="openModal('add-feed-modal')">+ Add Feed</button>
+        </div>
+    </div>
+
+    <!-- ARTICLES VIEW -->
+    <div id="view-articles" class="view-container hidden">
+        <div class="app-header">
+            <h2 id="current-feed-name" class="header-title"></h2>
+            <button class="header-btn" onclick="refreshArticles()">↻ Refresh</button>
+        </div>
+        <div id="article-list" class="scroll-area"></div>
+    </div>
+
+    <!-- ADD FEED MODAL -->
+    <div id="add-feed-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Add New Feed</div>
+            <input type="text" id="feed-title-input" class="editor-input" placeholder="Feed Title (e.g., BBC News)">
+            <input type="url" id="feed-url-input" class="editor-input" placeholder="RSS/Atom URL">
+            
+            <div class="modal-actions">
+                <button class="text-btn" style="color: var(--md-sys-color-error);" onclick="closeModal('add-feed-modal')">CANCEL</button>
+                <button class="text-btn" style="color: var(--md-sys-color-primary);" onclick="saveFeed()">SAVE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Settings & Data</div>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+                <p style="color: var(--md-sys-color-on-surface-variant); text-align: center; margin-bottom: 24px;">
+                    Export your RSS feeds for backup or transfer.
+                </p>
+                <button class="settings-btn" onclick="exportData()">&#128228; Export Backup (JSON)</button>
+                <button class="settings-btn" onclick="document.getElementById('import-file').click()">&#128229; Import Backup</button>
+                <input type="file" id="import-file" style="display: none;" accept=".json" onchange="importData(event)">
+            </div>
+            <div class="modal-actions">
+                <button class="text-btn" style="color: var(--md-sys-color-error);" onclick="closeModal('settings-modal')">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- REORDER MODAL -->
+    <div id="reorder-modal" class="modal" style="background: rgba(0,0,0,0.7);">
+        <div class="modal-content" style="flex: none; margin: auto; height: auto;">
+            <div class="modal-header" style="justify-content: center;">Reorder Feed</div>
+            <button class="text-btn" style="color: var(--md-sys-color-primary); margin-bottom: 12px;" onclick="moveFeed(0)">&#9195; Move to Top</button>
+            <button class="text-btn" style="color: var(--md-sys-color-primary); margin-bottom: 12px;" onclick="moveFeed(-1)">&#8679; Move Up</button>
+            <button class="text-btn" style="color: var(--md-sys-color-primary); margin-bottom: 12px;" onclick="moveFeed(1)">&#8681; Move Down</button>
+            <button class="text-btn" style="color: var(--md-sys-color-primary); margin-bottom: 12px;" onclick="moveFeed(999)">&#9196; Move to Bottom</button>
+            <button class="text-btn" style="color: var(--md-sys-color-error);" onclick="closeModal('reorder-modal')">&#10006;&#65039; Cancel</button>
+        </div>
+    </div>
+
+<script>
+    // Load Feeds from Local Storage
+    let feeds = JSON.parse(localStorage.getItem('m3e_rss_feeds')) || [];
+    let currentActiveFeedUrl = "";
+    let currentActiveFeedTitle = "";
+    let currentFetchId = 0;
+    
+    // Reorder variables
+    let currentReorderIndex = null;
+    let longPressTimer;
+    let isLongPressing = false;
+
+    // DOM Elements
+    const viewFeeds = document.getElementById('view-feeds');
+    const viewArticles = document.getElementById('view-articles');
+    const feedList = document.getElementById('feed-list');
+    const articleList = document.getElementById('article-list');
+
+    // --- INITIALIZATION & NATIVE BACK BUTTON LOGIC ---
+    function init() {
+        if (location.hash) {
+            history.replaceState(null, '', location.pathname + location.search);
+        }
+        if (feeds.length === 0) {
+            feeds.push({ id: Date.now(), title: "BBC News", url: "http://feeds.bbci.co.uk/news/rss.xml" });
+            saveToStorage();
+        }
+        renderFeeds();
+    }
+
+    // Listens for the hardware back button / native gesture
+    window.addEventListener('hashchange', () => {
+        if (location.hash === '#articles') {
+            viewFeeds.classList.add('hidden');
+            viewArticles.classList.remove('hidden');
+        } else {
+            viewFeeds.classList.remove('hidden');
+            viewArticles.classList.add('hidden');
+        }
+    });
+
+    function openArticlesView() {
+        if (location.hash !== '#articles') {
+            location.hash = 'articles'; // Safely pushes the state to History
+        } else {
+            viewFeeds.classList.add('hidden');
+            viewArticles.classList.remove('hidden');
+        }
+    }
+
+    // --- FEED MANAGEMENT & REORDERING ---
+    function saveToStorage() {
+        localStorage.setItem('m3e_rss_feeds', JSON.stringify(feeds));
+    }
+
+    function renderFeeds() {
+        feedList.innerHTML = '';
+        feeds.forEach((feed, index) => {
+            let domain = "google.com";
+            try { 
+                let urlObj = new URL(feed.url);
+                domain = urlObj.hostname;
+                if (domain.includes("bbci.co.uk") || domain.includes("bbc.co.uk")) domain = "bbc.co.uk";
+            } catch(e) {}
+            const iconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+
+            const btn = document.createElement('div');
+            btn.className = 'feed-btn';
+            btn.innerHTML = `
+                <img src="${iconUrl}" class="feed-icon" onerror="this.style.display='none'">
+                <span class="feed-title">${escapeHtml(feed.title)}</span>
+                <button class="feed-delete" onclick="deleteFeed(${feed.id}, event)">✖</button>
+            `;
+
+            // Touch events for long-press detection
+            btn.addEventListener('touchstart', (e) => {
+                if(e.target.classList.contains('feed-delete')) return;
+                isLongPressing = false;
+                longPressTimer = setTimeout(() => {
+                    isLongPressing = true;
+                    openReorder(index);
+                }, 600);
+            });
+            btn.addEventListener('touchend', () => clearTimeout(longPressTimer));
+            btn.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+
+            // Mouse events for desktop/testing
+            btn.addEventListener('mousedown', (e) => {
+                if(e.target.classList.contains('feed-delete')) return;
+                isLongPressing = false;
+                longPressTimer = setTimeout(() => {
+                    isLongPressing = true;
+                    openReorder(index);
+                }, 600);
+            });
+            btn.addEventListener('mouseup', () => clearTimeout(longPressTimer));
+            btn.addEventListener('mouseleave', () => clearTimeout(longPressTimer));
+
+            btn.onclick = (e) => {
+                if (isLongPressing) {
+                    isLongPressing = false; // Block the click if we just triggered a long press
+                    return;
+                }
+                if(!e.target.classList.contains('feed-delete')) {
+                    fetchArticles(feed.url, feed.title);
+                }
+            };
+            feedList.appendChild(btn);
+        });
+    }
+
+    function openReorder(index) { 
+        currentReorderIndex = index; 
+        document.getElementById('reorder-modal').classList.add('active'); 
+    }
+
+    function moveFeed(direction) {
+        const idx = currentReorderIndex;
+        if (idx === null || feeds.length < 2) return;
+        const item = feeds.splice(idx, 1)[0];
+        
+        if (direction === 0) feeds.unshift(item); 
+        else if (direction === 999) feeds.push(item); 
+        else {
+            let newIdx = idx + direction;
+            if (newIdx < 0) newIdx = 0;
+            if (newIdx > feeds.length) newIdx = feeds.length;
+            feeds.splice(newIdx, 0, item);
+        }
+        
+        saveToStorage();
+        renderFeeds();
+        closeModal('reorder-modal');
+    }
+
+    function saveFeed() {
+        const title = document.getElementById('feed-title-input').value.trim();
+        const url = document.getElementById('feed-url-input').value.trim();
+        if(!title || !url) { alert("Please enter both a title and a URL."); return; }
+        
+        feeds.push({ id: Date.now(), title, url });
+        saveToStorage();
+        renderFeeds();
+        
+        document.getElementById('feed-title-input').value = '';
+        document.getElementById('feed-url-input').value = '';
+        closeModal('add-feed-modal');
+    }
+
+    function deleteFeed(id, event) {
+        event.stopPropagation();
+        if(confirm("Delete this feed?")) {
+            feeds = feeds.filter(f => f.id !== id);
+            saveToStorage();
+            renderFeeds();
+        }
+    }
+
+    // --- NETWORK ENGINE ---
+    async function fetchWithTimeout(url, timeoutMs) {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(id);
+            return response;
+        } catch (error) {
+            clearTimeout(id);
+            throw error;
+        }
+    }
+
+    async function fetchArticles(url, title) {
+        currentActiveFeedUrl = url;
+        currentActiveFeedTitle = title;
+        document.getElementById('current-feed-name').innerText = title;
+        
+        openArticlesView();
+        articleList.innerHTML = '<div class="loading-text">Fetching articles...</div>';
+        const fetchId = ++currentFetchId;
+
+        try {
+            // Pointing directly to your shiny new private proxy!
+            const proxyUrl = 'https://rss-proxy.slaterjohn2.workers.dev'; 
+            const apiUrl = `${proxyUrl}/?url=${encodeURIComponent(url)}`;
+            
+            // Back to a snappy 8-second timeout, because Cloudflare is incredibly fast
+            const res = await fetchWithTimeout(apiUrl, 8000);
+            
+            if (res.ok) {
+                const xmlText = await res.text();
+                
+                // Parse the raw XML natively in the browser
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                
+                if (fetchId !== currentFetchId) return;
+
+                const items = xmlDoc.querySelectorAll("item, entry");
+                if (items.length > 0) {
+                    const articles = [];
+                    
+                    items.forEach(item => {
+                        let artTitle = "No Title";
+                        let artLink = "";
+                        let artDesc = "";
+                        let artDate = "";
+                        
+                        // Extract standard text nodes safely
+                        for (let el of item.children) {
+                            const tag = el.tagName.toLowerCase();
+                            
+                            if (tag === "title") artTitle = el.textContent;
+                            if (tag === "link") artLink = el.textContent.trim() || el.getAttribute("href") || artLink;
+                            if (tag === "pubdate" || tag === "published" || tag === "updated") artDate = el.textContent;
+                            if (tag === "description" || tag === "summary" || tag === "content" || tag === "content:encoded") {
+                                if (el.textContent.length > artDesc.length) artDesc = el.textContent;
+                            }
+                        }
+                        
+                        // --- EXACT REPLICA OF JAVA IMAGE HUNTER ---
+                        let img = null;
+                        const allElements = item.getElementsByTagName("*");
+                        
+                        for (let el of allElements) {
+                            const tagName = el.tagName.toLowerCase();
+                            
+                            if (tagName === "enclosure" || tagName === "media:content" || tagName === "media:thumbnail" || tagName === "thumbnail" || tagName === "image") {
+                                const type = el.getAttribute("type") || "";
+                                const urlAttr = el.getAttribute("url") || el.getAttribute("href");
+                                
+                                if (urlAttr) {
+                                    let urlLower = urlAttr.toLowerCase();
+                                    
+                                    if (tagName.includes("thumbnail") || 
+                                        type.startsWith("image/") || 
+                                        urlLower.includes(".jpg") || urlLower.includes(".jpeg") || 
+                                        urlLower.includes(".png") || urlLower.includes(".webp") || 
+                                        urlLower.includes("guim.co.uk") || urlLower.includes("ichef.bbci.co.uk")) {
+                                        img = urlAttr;
+                                        break; 
+                                    }
+                                } else if (tagName === "image" && el.textContent && el.textContent.trim().startsWith("http")) {
+                                    img = el.textContent.trim();
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Fallback: Scrape from description
+                        if (!img && artDesc) {
+                            const match = artDesc.match(/<img[^>]+src\s*=\s*['"]([^'"]+)['"]/i);
+                            if (match) img = match[1].replace(/&amp;/g, "&");
+                        }
+                        
+                        articles.push({ 
+                            title: artTitle, 
+                            link: artLink, 
+                            desc: artDesc, 
+                            img: img, 
+                            date: artDate 
+                        });
+                    });
+                    
+                    renderArticles(articles);
+                } else {
+                    articleList.innerHTML = `<div class="loading-text" style="color: var(--md-sys-color-error);">No articles found for this feed.</div>`;
+                }
+            } else {
+                if (fetchId === currentFetchId) {
+                    articleList.innerHTML = `<div class="loading-text" style="color: var(--md-sys-color-error);">Failed to load feed. The proxy returned an error.</div>`;
+                }
+            }
+        } catch(e) {
+            if (fetchId === currentFetchId) {
+                articleList.innerHTML = `<div class="loading-text" style="color: var(--md-sys-color-error);">Network error. Ensure the URL is valid and accessible.</div>`;
+                console.error(e);
+            }
+        }
+    }
+    
+    function renderArticles(articles) {
+        articleList.innerHTML = '';
+        
+        articles.forEach(art => {
+            const tempDiv = document.createElement("div");
+            tempDiv.innerHTML = art.desc;
+            const cleanDesc = tempDiv.textContent || tempDiv.innerText || "";
+
+            const card = document.createElement('a');
+            card.className = 'article-card';
+            card.href = art.link;
+            card.target = "_blank"; 
+
+            let imgHtml = '';
+            if (art.img) {
+                imgHtml = `
+                <div class="article-img-container">
+                    <img src="${art.img}" class="article-img" loading="lazy">
+                </div>`;
+            }
+
+            card.innerHTML = `
+                ${imgHtml}
+                <div class="article-content">
+                    <div class="article-title">${escapeHtml(art.title)}</div>
+                    ${cleanDesc ? `<div class="article-desc">${escapeHtml(cleanDesc)}</div>` : ''}
+                    ${art.date ? `<div class="article-date">${escapeHtml(art.date)}</div>` : ''}
+                </div>
+            `;
+            
+            articleList.appendChild(card);
+        });
+    }
+
+    function refreshArticles() {
+        if(currentActiveFeedUrl) fetchArticles(currentActiveFeedUrl, currentActiveFeedTitle);
+    }
+
+    // --- UTILS & MODALS ---
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+    function escapeHtml(text) { return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+    // --- BACKUP & SYNC ---
+    function exportData() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(feeds));
+        const downloadNode = document.createElement('a');
+        downloadNode.setAttribute("href", dataStr);
+        downloadNode.setAttribute("download", "rss_backup.json");
+        document.body.appendChild(downloadNode);
+        downloadNode.click();
+        downloadNode.remove();
+    }
+
+    function importData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const imported = JSON.parse(e.target.result);
+                if(Array.isArray(imported)) {
+                    feeds = imported;
+                    saveToStorage();
+                    renderFeeds();
+                    closeModal('settings-modal');
+                    alert("Feeds imported successfully!");
+                }
+            } catch (err) { alert("Invalid backup file."); }
+        };
+        reader.readAsText(file);
+        event.target.value = ''; 
+    }
+
+    // Boot
+    init();
+
+</script>
+</body>
+</html>
